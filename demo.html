@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareFlow — Interactive Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:    #060d1c;
+      --card:  #0c1829;
+      --card2: #101f35;
+      --teal:  #00c9a7;
+      --red:   #f43f5e;
+      --amber: #f59e0b;
+      --green: #10b981;
+      --blue:  #38bdf8;
+      --text:  #f1f5f9;
+      --sub:   #64748b;
+      --bdr:   rgba(148,163,184,0.1);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* subtle radial glow */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse at 65% 35%, rgba(0,201,167,.05) 0%, transparent 55%),
+        radial-gradient(ellipse at 20% 75%, rgba(56,189,248,.04) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      height: 3.25rem;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 1.25rem;
+      background: rgba(6,13,28,.85);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--bdr);
+    }
+    .tb-logo { font-weight: 900; font-size: .95rem; color: var(--teal); letter-spacing: -.4px; }
+    .tb-right { display: flex; align-items: center; gap: .75rem; }
+
+    .step-track { display: flex; align-items: center; gap: .35rem; }
+    .step-pip {
+      height: 6px; width: 6px; border-radius: 3px;
+      background: var(--bdr);
+      transition: width .3s, background .3s;
+    }
+    .step-pip.done   { background: rgba(0,201,167,.35); }
+    .step-pip.active { background: var(--teal); width: 20px; }
+
+    .back-btn {
+      background: transparent; border: 1px solid var(--bdr);
+      color: var(--sub); border-radius: 6px;
+      padding: .28rem .7rem; font-size: .72rem;
+      cursor: pointer; font-family: inherit;
+      transition: color .2s, border-color .2s;
+    }
+    .back-btn:hover  { color: var(--text); border-color: rgba(148,163,184,.3); }
+    .back-btn:disabled { opacity: 0; pointer-events: none; }
+
+    /* ── SCREEN SYSTEM ── */
+    .screen {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 4.5rem 1.25rem 1.5rem;
+      opacity: 0; pointer-events: none;
+      transition: opacity .35s ease;
+      overflow-y: auto;
+    }
+    .screen.active { opacity: 1; pointer-events: auto; }
+
+    /* ── SHARED BUTTONS ── */
+    .btn-primary {
+      background: var(--teal); color: #060d1c;
+      border: none; border-radius: 8px;
+      padding: .72rem 1.6rem; font-size: .88rem; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      transition: background .2s, transform .1s;
+    }
+    .btn-primary:hover  { background: #00dfba; transform: translateY(-1px); }
+    .btn-primary:active { transform: none; }
+
+    .btn-ghost {
+      background: transparent; color: var(--sub);
+      border: 1px solid var(--bdr); border-radius: 8px;
+      padding: .72rem 1.1rem; font-size: .85rem;
+      cursor: pointer; font-family: inherit;
+      transition: color .2s, border-color .2s, background .2s;
+    }
+    .btn-ghost:hover { color: var(--text); border-color: rgba(148,163,184,.3); background: var(--card2); }
+
+    /* ════════════════════════════════════════════
+       SCREEN 1 — WELCOME
+    ════════════════════════════════════════════ */
+    .s1-eye {
+      font-size: .65rem; font-weight: 700; color: var(--teal);
+      text-transform: uppercase; letter-spacing: .15em; margin-bottom: .9rem;
+    }
+    .s1-h1 {
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      font-weight: 900; letter-spacing: -1.2px;
+      text-align: center; line-height: 1.1;
+      max-width: 580px; margin-bottom: .75rem;
+    }
+    .s1-h1 em { color: var(--teal); font-style: normal; }
+    .s1-sub {
+      font-size: .9rem; color: var(--sub); text-align: center;
+      max-width: 460px; line-height: 1.65; margin-bottom: 2.25rem;
+    }
+
+    .stat-strip {
+      display: flex; gap: 1px;
+      background: var(--bdr); border-radius: 12px; overflow: hidden;
+      width: 100%; max-width: 560px; margin-bottom: 2.25rem;
+    }
+    .stat-cell {
+      flex: 1; background: var(--card);
+      padding: 1.1rem .9rem; text-align: center;
+    }
+    .stat-cell:first-child { border-radius: 12px 0 0 12px; }
+    .stat-cell:last-child  { border-radius: 0 12px 12px 0; }
+    .stat-val  { font-size: 1.45rem; font-weight: 800; color: var(--red); }
+    .stat-lbl  { font-size: .68rem; color: var(--sub); margin-top: .25rem; line-height: 1.4; }
+
+    /* ════════════════════════════════════════════
+       SCREEN 2 — ED QUEUE
+    ════════════════════════════════════════════ */
+    .queue-wrap { width: 100%; max-width: 640px; }
+    .queue-hdr {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: .75rem;
+    }
+    .queue-title { font-size: .9rem; font-weight: 600; }
+    .queue-sub   { font-size: .7rem; color: var(--sub); margin-top: 2px; }
+
+    .live-pill {
+      display: flex; align-items: center; gap: .35rem;
+      background: rgba(244,63,94,.1); border: 1px solid rgba(244,63,94,.3);
+      border-radius: 100px; padding: .28rem .65rem;
+      font-size: .65rem; font-weight: 700; color: var(--red); letter-spacing: .05em;
+    }
+    .live-dot {
+      width: 5px; height: 5px; background: var(--red); border-radius: 50%;
+      animation: blink 1.2s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+    .pt-list { display: flex; flex-direction: column; gap: .45rem; margin-bottom: .65rem; }
+    .pt-row {
+      background: var(--card); border: 1px solid var(--bdr);
+      border-radius: 10px; padding: .8rem 1rem;
+      display: grid; grid-template-columns: 9px 1fr auto;
+      gap: .8rem; align-items: center;
+      transition: border-color .3s, background .3s;
+    }
+    .pt-row.warn { border-color: rgba(245,158,11,.4); }
+    .pt-row.crit {
+      border-color: rgba(244,63,94,.55);
+      background: rgba(244,63,94,.06);
+      animation: critBdr 2s ease-in-out infinite;
+    }
+    @keyframes critBdr { 0%,100%{border-color:rgba(244,63,94,.55)} 50%{border-color:rgba(244,63,94,.9)} }
+
+    .ind { width: 8px; height: 8px; border-radius: 50%; }
+    .ind-ok     { background: var(--green); }
+    .ind-active { background: var(--blue); }
+    .ind-warn   { background: var(--amber); }
+    .ind-crit   { background: var(--red); animation: blink 1s infinite; }
+
+    .pt-name   { font-size: .86rem; font-weight: 500; }
+    .pt-detail { font-size: .7rem; color: var(--sub); margin-top: 2px; }
+    .pt-wait   { font-size: .78rem; font-weight: 500; text-align: right; white-space: nowrap; }
+    .pt-wait.ok   { color: var(--sub); }
+    .pt-wait.warn { color: var(--amber); }
+    .pt-wait.crit { color: var(--red); font-weight: 700; }
+
+    .alert-banner {
+      background: rgba(244,63,94,.1); border: 1px solid rgba(244,63,94,.4);
+      border-radius: 10px; padding: .9rem 1rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      opacity: 0; transform: translateY(6px);
+      transition: opacity .45s ease, transform .45s ease;
+    }
+    .alert-banner.show { opacity: 1; transform: none; }
+    .ab-main { font-size: .84rem; font-weight: 700; color: var(--red); }
+    .ab-sub  { font-size: .7rem; color: var(--sub); margin-top: 2px; }
+
+    /* ════════════════════════════════════════════
+       SCREEN 3 — ALERT
+    ════════════════════════════════════════════ */
+    .alert-card {
+      background: var(--card); border: 1.5px solid rgba(244,63,94,.5);
+      border-radius: 16px; padding: 1.65rem;
+      max-width: 450px; width: 100%; position: relative; overflow: hidden;
+    }
+    .alert-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--red), var(--amber));
+    }
+
+    .alrt-hdr { display: flex; align-items: flex-start; gap: .7rem; margin-bottom: 1.2rem; }
+    .alrt-icon {
+      background: rgba(244,63,94,.15); border-radius: 9px;
+      padding: .55rem; font-size: 1.2rem; line-height: 1; flex-shrink: 0;
+    }
+    .alrt-ttl  { font-size: .98rem; font-weight: 800; color: var(--red); letter-spacing: .01em; }
+    .alrt-sub  { font-size: .7rem; color: var(--sub); margin-top: 2px; }
+
+    .cd-bar {
+      background: rgba(244,63,94,.1); border: 1px solid rgba(244,63,94,.25);
+      border-radius: 8px; padding: .65rem .9rem;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1.2rem;
+    }
+    .cd-lbl   { font-size: .7rem; color: var(--sub); }
+    .cd-timer {
+      font-size: 1.35rem; font-weight: 800; color: var(--red);
+      font-variant-numeric: tabular-nums; letter-spacing: -.4px;
+    }
+
+    .info-grid {
+      display: grid; grid-template-columns: 95px 1fr;
+      gap: .45rem .7rem; margin-bottom: 1.2rem;
+    }
+    .ig-lbl { font-size: .68rem; color: var(--sub); display: flex; align-items: center; }
+    .ig-val { font-size: .8rem; font-weight: 500; }
+    .ig-val.hi { color: var(--amber); }
+
+    .action-box {
+      background: rgba(0,201,167,.08); border: 1px solid rgba(0,201,167,.25);
+      border-radius: 10px; padding: .9rem; margin-bottom: 1.2rem;
+    }
+    .axn-lbl {
+      font-size: .62rem; font-weight: 700; color: var(--teal);
+      text-transform: uppercase; letter-spacing: .1em; margin-bottom: .4rem;
+    }
+    .axn-main { font-size: .86rem; font-weight: 600; margin-bottom: .25rem; }
+    .axn-sub  { font-size: .7rem; color: var(--sub); }
+
+    .btn-pair { display: flex; gap: .55rem; }
+    .btn-confirm {
+      flex: 1; background: var(--teal); color: #060d1c;
+      border: none; border-radius: 8px; padding: .75rem;
+      font-size: .87rem; font-weight: 800; cursor: pointer; font-family: inherit;
+      transition: background .2s;
+    }
+    .btn-confirm:hover { background: #00dfba; }
+    .btn-dismiss {
+      background: transparent; color: var(--sub);
+      border: 1px solid var(--bdr); border-radius: 8px; padding: .75rem .9rem;
+      font-size: .85rem; cursor: pointer; font-family: inherit;
+      transition: color .2s, border-color .2s;
+    }
+    .btn-dismiss:hover { color: var(--text); border-color: rgba(148,163,184,.3); }
+
+    /* ════════════════════════════════════════════
+       SCREEN 4 — SUCCESS
+    ════════════════════════════════════════════ */
+    .success-card {
+      background: var(--card); border: 1.5px solid rgba(16,185,129,.4);
+      border-radius: 16px; padding: 1.9rem;
+      max-width: 450px; width: 100%; position: relative; overflow: hidden;
+    }
+    .success-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--teal), var(--green));
+    }
+
+    .suc-top { text-align: center; margin-bottom: 1.5rem; }
+    .suc-emoji { font-size: 2.4rem; margin-bottom: .65rem; }
+    .suc-h    { font-size: 1.25rem; font-weight: 800; color: var(--green); }
+    .suc-sub  { font-size: .78rem; color: var(--sub); margin-top: .3rem; }
+
+    .comparison {
+      display: grid; grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--bdr); border-radius: 10px; overflow: hidden;
+      margin-bottom: 1.2rem;
+    }
+    .cmp-b { background: rgba(244,63,94,.08); padding: .9rem; border-right: 1px solid var(--bdr); }
+    .cmp-a { background: rgba(16,185,129,.08); padding: .9rem; }
+    .cmp-lbl { font-size: .62rem; color: var(--sub); text-transform: uppercase; letter-spacing: .07em; }
+    .cmp-val { font-size: 1.35rem; font-weight: 800; margin-top: .25rem; }
+    .cmp-val.bad  { color: var(--red); }
+    .cmp-val.good { color: var(--green); }
+    .cmp-detail { font-size: .68rem; color: var(--sub); margin-top: .2rem; }
+
+    .feedback-row {
+      display: flex; align-items: center; gap: .7rem;
+      background: var(--card2); border-radius: 8px;
+      padding: .8rem .9rem; margin-bottom: 1.4rem;
+    }
+    .fb-icon { font-size: 1.2rem; flex-shrink: 0; }
+    .fb-text { font-size: .76rem; color: var(--sub); line-height: 1.5; }
+    .fb-text strong { color: var(--teal); }
+
+    /* ════════════════════════════════════════════
+       SCREEN 5 — DASHBOARD
+    ════════════════════════════════════════════ */
+    .db-wrap { width: 100%; max-width: 610px; }
+    .db-hdr { margin-bottom: .9rem; }
+    .db-title { font-size: .96rem; font-weight: 700; }
+    .db-sub   { font-size: .7rem; color: var(--sub); margin-top: 2px; }
+
+    .metrics-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; margin-bottom: .6rem;
+    }
+    .m-tile {
+      background: var(--card); border: 1px solid var(--bdr);
+      border-radius: 10px; padding: .95rem 1.1rem;
+    }
+    .m-lbl { font-size: .62rem; color: var(--sub); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .4rem; }
+    .m-val { font-size: 1.55rem; font-weight: 800; }
+    .m-val.teal  { color: var(--teal); }
+    .m-val.green { color: var(--green); }
+    .m-val.amber { color: var(--amber); }
+    .m-delta { font-size: .68rem; color: var(--green); margin-top: .2rem; }
+
+    .chart-panel {
+      background: var(--card); border: 1px solid var(--bdr);
+      border-radius: 10px; padding: 1.1rem; margin-bottom: .8rem;
+    }
+    .chart-lbl { font-size: .62rem; color: var(--sub); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .85rem; }
+
+    .bars { display: flex; align-items: flex-end; gap: .4rem; height: 64px; }
+    .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .22rem; height: 100%; justify-content: flex-end; }
+    .bar-fill { width: 100%; border-radius: 4px 4px 0 0; min-height: 4px; }
+    .bar-day { font-size: .58rem; color: var(--sub); }
+
+    .chart-leg {
+      display: flex; justify-content: space-between; margin-top: .55rem;
+    }
+    .leg-item { display: flex; align-items: center; gap: .28rem; font-size: .6rem; color: var(--sub); }
+    .leg-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+    .db-actions { display: flex; gap: .7rem; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 480px) {
+      .stat-strip { flex-direction: column; gap: 0; }
+      .stat-cell:first-child { border-radius: 12px 12px 0 0; }
+      .stat-cell:last-child  { border-radius: 0 0 12px 12px; }
+      .s1-h1 { letter-spacing: -.8px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ TOP BAR ══ -->
+<header class="topbar">
+  <button class="back-btn" id="backBtn" onclick="prevScreen()" disabled>← Back</button>
+  <div class="step-track" id="stepTrack">
+    <div class="step-pip active" id="p1"></div>
+    <div class="step-pip" id="p2"></div>
+    <div class="step-pip" id="p3"></div>
+    <div class="step-pip" id="p4"></div>
+    <div class="step-pip" id="p5"></div>
+  </div>
+  <div class="tb-logo">CareFlow</div>
+</header>
+
+<!-- ══════════════════════════════════════
+     SCREEN 1 — WELCOME
+══════════════════════════════════════ -->
+<section class="screen active" id="s1">
+  <p class="s1-eye">Interactive Product Demo</p>
+  <h1 class="s1-h1">Operational foresight for <em>emergency radiology</em></h1>
+  <p class="s1-sub">CareFlow predicts ED-to-CT bottlenecks 30–45 minutes before they breach — and delivers one action to one person, before the delay happens.</p>
+
+  <div class="stat-strip">
+    <div class="stat-cell">
+      <div class="stat-val">+59 min</div>
+      <div class="stat-lbl">CT adds to ED length of stay</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val">3–8×</div>
+      <div class="stat-lbl">Manual status checks per patient per shift</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val">$1–5M</div>
+      <div class="stat-lbl">Annual revenue at risk per ED</div>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="goTo(2)">Enter Demo →</button>
+  <p style="margin-top:.85rem; font-size:.68rem; color:var(--sub);">
+    Team 3 · HCMBA 2026 · Planning &amp; Financing New Ventures
+  </p>
+</section>
+
+<!-- ══════════════════════════════════════
+     SCREEN 2 — ED LIVE QUEUE
+══════════════════════════════════════ -->
+<section class="screen" id="s2">
+  <div class="queue-wrap">
+    <div class="queue-hdr">
+      <div>
+        <div class="queue-title">Charge Nurse View — ED Live Queue</div>
+        <div class="queue-sub">Sheba Medical Center · 14:23 · 32 active patients</div>
+      </div>
+      <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+    </div>
+
+    <div class="pt-list">
+      <div class="pt-row">
+        <div class="ind ind-ok"></div>
+        <div>
+          <div class="pt-name">Mr. David L. · Room 3</div>
+          <div class="pt-detail">Laceration repair — awaiting discharge</div>
+        </div>
+        <div class="pt-wait ok">Stable</div>
+      </div>
+      <div class="pt-row">
+        <div class="ind ind-active"></div>
+        <div>
+          <div class="pt-name">Ms. Anat K. · Room 5</div>
+          <div class="pt-detail">CT Chest — scan in progress</div>
+        </div>
+        <div class="pt-wait ok">In scan</div>
+      </div>
+      <div class="pt-row warn">
+        <div class="ind ind-warn"></div>
+        <div>
+          <div class="pt-name">Mr. Ron B. · Room 9</div>
+          <div class="pt-detail">CT Abdomen — awaiting transport</div>
+        </div>
+        <div class="pt-wait warn">42 min</div>
+      </div>
+      <div class="pt-row crit">
+        <div class="ind ind-crit"></div>
+        <div>
+          <div class="pt-name">Mrs. Sarah C. · Room 7</div>
+          <div class="pt-detail">CT Abdomen + Pelvis — queue backed up (4 ahead)</div>
+        </div>
+        <div class="pt-wait crit">78 min ⚠</div>
+      </div>
+    </div>
+
+    <div class="alert-banner" id="alertBanner">
+      <div>
+        <div class="ab-main">⚠ CareFlow — CT breach predicted in 28 min</div>
+        <div class="ab-sub">Mrs. Sarah C. · Scanner 1 backed up · Suggested: re-route to Scanner 2 (idle)</div>
+      </div>
+      <button class="btn-primary" onclick="goTo(3)"
+        style="padding:.55rem 1rem; font-size:.8rem; white-space:nowrap; flex-shrink:0;">
+        View Alert
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SCREEN 3 — CHARGE NURSE ALERT
+══════════════════════════════════════ -->
+<section class="screen" id="s3">
+  <div class="alert-card">
+    <div class="alrt-hdr">
+      <div class="alrt-icon">⚠️</div>
+      <div>
+        <div class="alrt-ttl">CT BREACH PREDICTED</div>
+        <div class="alrt-sub">CareFlow · Charge Nurse Alert · 14:23:07</div>
+      </div>
+    </div>
+
+    <div class="cd-bar">
+      <div class="cd-lbl">Time to threshold breach</div>
+      <div class="cd-timer" id="timerEl">27:43</div>
+    </div>
+
+    <div class="info-grid">
+      <div class="ig-lbl">Patient</div>
+      <div class="ig-val">Mrs. Sarah Cohen · Room 7</div>
+
+      <div class="ig-lbl">Exam ordered</div>
+      <div class="ig-val">CT Abdomen + Pelvis (contrast)</div>
+
+      <div class="ig-lbl">Root cause</div>
+      <div class="ig-val hi">Scanner 1 queue — 4 exams ahead</div>
+
+      <div class="ig-lbl">Target TAT</div>
+      <div class="ig-val">60 min &nbsp;·&nbsp; Projected: 106 min</div>
+    </div>
+
+    <div class="action-box">
+      <div class="axn-lbl">Suggested Action</div>
+      <div class="axn-main">Re-route to Scanner 2 (currently idle)</div>
+      <div class="axn-sub">Estimated new TAT: 52 min · Saves ~35 min · Within threshold ✓</div>
+    </div>
+
+    <div class="btn-pair">
+      <button class="btn-confirm" onclick="goTo(4)">✓ Confirm Action</button>
+      <button class="btn-dismiss" onclick="goTo(2)">Dismiss</button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SCREEN 4 — BREACH PREVENTED
+══════════════════════════════════════ -->
+<section class="screen" id="s4">
+  <div class="success-card">
+    <div class="suc-top">
+      <div class="suc-emoji">✅</div>
+      <div class="suc-h">Breach Prevented</div>
+      <div class="suc-sub">Action confirmed · Scanner re-assigned · Response logged</div>
+    </div>
+
+    <div class="comparison">
+      <div class="cmp-b">
+        <div class="cmp-lbl">Without CareFlow</div>
+        <div class="cmp-val bad">106 min</div>
+        <div class="cmp-detail">46 min over target — LOS breach</div>
+      </div>
+      <div class="cmp-a">
+        <div class="cmp-lbl">With CareFlow</div>
+        <div class="cmp-val good">52 min</div>
+        <div class="cmp-detail">8 min under target — resolved</div>
+      </div>
+    </div>
+
+    <div class="feedback-row">
+      <div class="fb-icon">🧠</div>
+      <div class="fb-text">
+        <strong>Feedback loop updated.</strong> Scanner 2 preference during
+        14:00–16:00 weighted for future predictions. Model accuracy compounds
+        with every confirmed response.
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="goTo(5)" style="width:100%;">
+      View Today's ROI Dashboard →
+    </button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SCREEN 5 — COO DASHBOARD
+══════════════════════════════════════ -->
+<section class="screen" id="s5">
+  <div class="db-wrap">
+    <div class="db-hdr">
+      <div class="db-title">ED Intelligence Dashboard</div>
+      <div class="db-sub">Today · Shift 14:00–22:00 · Sheba Medical Center</div>
+    </div>
+
+    <div class="metrics-grid">
+      <div class="m-tile">
+        <div class="m-lbl">Breaches Prevented</div>
+        <div class="m-val teal">3</div>
+        <div class="m-delta">↑ +1 vs. yesterday</div>
+      </div>
+      <div class="m-tile">
+        <div class="m-lbl">Avg. TAT Recovery</div>
+        <div class="m-val green">31 min</div>
+        <div class="m-delta">per avoided breach</div>
+      </div>
+      <div class="m-tile">
+        <div class="m-lbl">Est. Revenue Saved</div>
+        <div class="m-val amber">$4,200</div>
+        <div class="m-delta">today · Mayer &amp; Jensen model</div>
+      </div>
+      <div class="m-tile">
+        <div class="m-lbl">Alert Response Rate</div>
+        <div class="m-val teal">94%</div>
+        <div class="m-delta">vs. 4–51% EHR baseline</div>
+      </div>
+    </div>
+
+    <div class="chart-panel">
+      <div class="chart-lbl">CT Avg. Turnaround Time — This Week</div>
+      <div class="bars">
+        <div class="bar-col">
+          <div class="bar-fill" style="height:91%; background:rgba(244,63,94,.55);"></div>
+          <div class="bar-day">Mon</div>
+        </div>
+        <div class="bar-col">
+          <div class="bar-fill" style="height:83%; background:rgba(244,63,94,.5);"></div>
+          <div class="bar-day">Tue</div>
+        </div>
+        <div class="bar-col">
+          <div class="bar-fill" style="height:73%; background:rgba(245,158,11,.6);"></div>
+          <div class="bar-day">Wed</div>
+        </div>
+        <div class="bar-col">
+          <div class="bar-fill" style="height:59%; background:rgba(245,158,11,.5);"></div>
+          <div class="bar-day">Thu</div>
+        </div>
+        <div class="bar-col">
+          <div class="bar-fill" style="height:42%; background:rgba(16,185,129,.6);"></div>
+          <div class="bar-day">Fri</div>
+        </div>
+        <div class="bar-col">
+          <div class="bar-fill" style="height:30%; background:rgba(0,201,167,.8);"></div>
+          <div class="bar-day">Today</div>
+        </div>
+      </div>
+      <div class="chart-leg">
+        <div class="leg-item">
+          <div class="leg-dot" style="background:rgba(244,63,94,.6);"></div>
+          Before CareFlow deployment
+        </div>
+        <div class="leg-item">
+          <div class="leg-dot" style="background:var(--teal);"></div>
+          With CareFlow active
+        </div>
+      </div>
+    </div>
+
+    <div class="db-actions">
+      <button class="btn-primary" onclick="goTo(1)">↺ Restart Demo</button>
+    </div>
+  </div>
+</section>
+
+<script>
+  let current = 1;
+  let timerSec = 27 * 60 + 43;
+  let timerInterval = null;
+  let bannerTimeout = null;
+
+  function goTo(n) {
+    document.getElementById('s' + current).classList.remove('active');
+    current = n;
+    document.getElementById('s' + n).classList.add('active');
+    updateNav(n);
+    if (n === 2) onScreen2();
+    if (n === 3) onScreen3();
+    if (n !== 3) clearInterval(timerInterval);
+  }
+
+  function prevScreen() { if (current > 1) goTo(current - 1); }
+
+  function updateNav(n) {
+    document.getElementById('backBtn').disabled = n <= 1;
+    for (let i = 1; i <= 5; i++) {
+      const p = document.getElementById('p' + i);
+      p.className = 'step-pip' + (i === n ? ' active' : i < n ? ' done' : '');
+    }
+  }
+
+  function onScreen2() {
+    const banner = document.getElementById('alertBanner');
+    banner.classList.remove('show');
+    clearTimeout(bannerTimeout);
+    bannerTimeout = setTimeout(() => banner.classList.add('show'), 1800);
+  }
+
+  function onScreen3() {
+    timerSec = 27 * 60 + 43;
+    renderTimer();
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => { if (timerSec > 0) timerSec--; renderTimer(); }, 1000);
+  }
+
+  function renderTimer() {
+    const el = document.getElementById('timerEl');
+    if (!el) return;
+    const m = Math.floor(timerSec / 60);
+    const s = timerSec % 60;
+    el.textContent = m + ':' + String(s).padStart(2, '0');
+  }
+</script>
+</body>
+</html>
